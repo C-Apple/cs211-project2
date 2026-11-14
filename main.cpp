@@ -15,14 +15,14 @@
  */
 
 #include <iostream>
-#include <string>
 #include <set>
+#include <string>
 
-using std::set;
 using std::cin;
 using std::cout;
 using std::endl;
 using std::getline;
+using std::set;
 using std::stoi;
 using std::string;
 
@@ -61,26 +61,19 @@ void help_command() {
   cout << "w -> what line will execute next?" << endl;
 }
 
-
 /**
  * @brief print program graph command
  *
  * @return void
  */
-void print_graph_command() {
-  
-}
-
+void print_graph_command(struct STMT *program) {}
 
 /**
  * @brief show memory contents command
  *
  * @return void
  */
-void show_memory_command() {
-  
-}
-
+void show_memory_command(struct RAM *memory) {}
 
 /**
  * @brief set breakpoint at line n command
@@ -88,10 +81,7 @@ void show_memory_command() {
  * @param n line number to set the breakpoint at
  * @return void
  */
-void breakpoint_command(int n) {
-  
-}
-
+void breakpoint_command(set<int> &breakpoints, int n) {}
 
 /**
  * @brief remove breakpoint at line n command
@@ -99,62 +89,44 @@ void breakpoint_command(int n) {
  * @param n line number to remove the breakpoint from
  * @return void
  */
-void remove_breakpoint_command(int n) {
-  
-}
-
+void remove_breakpoint_command(set<int> &breakpoints, int n) {}
 
 /**
  * @brief clear all breakpoint command
  *
  * @return void
  */
-void clear_breakpoint_command() {
-  
-}
-
+void clear_breakpoint_command(set<int> &breakpoints) {}
 
 /**
  * @brief list breakpoint command
  *
  * @return void
  */
-void list_breakpoint_command() {
-  
-}
-
+void list_breakpoint_command(set<int> &breakpoints) {}
 
 /**
  * @brief what line will execute next command
  *
  * @return void
  */
-void next_line_command() {
-  
-}
-
+void next_line_command(struct STMT *cur) {}
 
 /**
  * @brief step by executing the current statement command
  *
  * @return void
  */
-void step_command() {
-  
-}
-
+void step_command(struct STMT *&cur, struct RAM *memory, set<int> &breakpoints,
+                  bool &at_breakpoint) {}
 
 /**
  * @brief run program from current statement command
  *
  * @return void
  */
-void run_program_command() {
-  
-}
-
-
-
+void run_program_command(struct STMT *&cur, struct RAM *memory,
+                         set<int> &breakpoints, bool &at_breakpoint) {}
 
 /**
  * @brief main
@@ -170,7 +142,6 @@ void run_program_command() {
  */
 int main(int argc, char *argv[]) {
   FILE *input = nullptr;
-
   cout << "** Simple gdb for nuPython **" << endl;
 
   if (argc < 2) {
@@ -197,6 +168,15 @@ int main(int argc, char *argv[]) {
   }
 
   //
+  // TODO (A): parse input, build program graph, ram_init
+  //
+  struct STMT *program = nullptr;
+  struct RAM *memory = nullptr;
+  struct STMT *cur = program;
+  set<int> breakpoints;
+  bool at_breakpoint = false;
+
+  //
   // command loop:
   //
   string cmd;
@@ -215,27 +195,27 @@ int main(int argc, char *argv[]) {
     } else if (cmd == "h") {
       help_command();
     } else if (cmd == "pg") {
-      print_graph_command();
+      print_graph_command(program);
     } else if (cmd == "sm") {
-      show_memory_command();
+      show_memory_command(memory);
     } else if (cmd == "b") {
       int n;
       cin >> n;
-      breakpoint_command(n);
+      breakpoint_command(breakpoints, n);
     } else if (cmd == "rb") {
       int n;
       cin >> n;
-      remove_breakpoint_command(n);
+      remove_breakpoint_command(breakpoints, n);
     } else if (cmd == "cb") {
-      clear_breakpoint_command();
+      clear_breakpoint_command(breakpoints);
     } else if (cmd == "lb") {
-      list_breakpoint_command();
+      list_breakpoint_command(breakpoints);
     } else if (cmd == "w") {
-      next_line_command();
+      next_line_command(cur);
     } else if (cmd == "s") {
-      step_command();
+      step_command(cur, memory, breakpoints, at_breakpoint);
     } else if (cmd == "r") {
-      run_program_command();
+      run_program_command(cur, memory, breakpoints, at_breakpoint);
     } else {
       cout << "unknown command" << endl;
     }
@@ -248,6 +228,9 @@ int main(int argc, char *argv[]) {
   cout << endl;
   cout << "** Done **" << endl;
 
+  //
+  // TODO (A): ram_destroy, programgraph_destroy, tokenqueue_destroy
+  //
   fclose(input);
 
   return 0;
