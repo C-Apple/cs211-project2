@@ -33,7 +33,8 @@ using std::string;
 // C++ compiler that the functions in the provided
 // nuPython code are C functions:
 //
-extern "C" {
+extern "C"
+{
 #include "execute.h"
 #include "parser.h"
 #include "programgraph.h"
@@ -46,7 +47,8 @@ extern "C" {
  *
  * @return void
  */
-void help_command() {
+void help_command()
+{
   cout << "Available commands:" << endl;
   cout << "h -> help with list of commands" << endl;
   cout << "q -> quit the debugger" << endl;
@@ -66,7 +68,8 @@ void help_command() {
  *
  * @return void
  */
-void print_graph_command(struct STMT *program) {
+void print_graph_command(struct STMT *program)
+{
   programgraph_print(program);
 }
 
@@ -75,8 +78,10 @@ void print_graph_command(struct STMT *program) {
  *
  * @return void
  */
-void show_memory_command(struct RAM *memory) {
-  ram_print(memory);
+void show_memory_command(struct RAM *memory)
+{
+  ram_print_map(memory);
+  return;
 }
 
 /**
@@ -85,12 +90,10 @@ void show_memory_command(struct RAM *memory) {
  * @param n line number to set the breakpoint at
  * @return void
  */
-void breakpoint_command(set<int> &breakpoints, int n) {
-  if (breakpoints.count(n)) cout << "breakpoint exists" << endl;
-  else {
-    breakpoints.insert(n);
-    cout << "breakpoint set" << endl;
-  }
+void breakpoint_command(set<int> &breakpoints, int n)
+{
+  breakpoints.insert(n);
+  return;
 }
 
 /**
@@ -99,14 +102,10 @@ void breakpoint_command(set<int> &breakpoints, int n) {
  * @param n line number to remove the breakpoint from
  * @return void
  */
-void remove_breakpoint_command(set<int> &breakpoints, int n) {
-  if (!breakpoints.count(n)) {
-    cout << "no such breakpoint" << endl;
-  }
-  else {
-    breakpoints.erase(n);  // remove breakpoint
-    cout << "breakpoint removed" << endl;
-  }
+void remove_breakpoint_command(set<int> &breakpoints, int n)
+{
+  breakpoints.erase(n);
+  return;
 }
 
 /**
@@ -114,9 +113,9 @@ void remove_breakpoint_command(set<int> &breakpoints, int n) {
  *
  * @return void
  */
-void clear_breakpoint_command(set<int> &breakpoints) {
-  breakpoints.clear();   // remove all elements from set<int> breakpoints
-  cout << "all breakpoints removed" << endl;
+void clear_breakpoint_command(set<int> &breakpoints)
+{
+  breakpoints.clear();
 }
 
 /**
@@ -124,17 +123,63 @@ void clear_breakpoint_command(set<int> &breakpoints) {
  *
  * @return void
  */
-void list_breakpoint_command(set<int> &breakpoints) {
-  if (breakpoints.empty()) cout << "breakpoints: none" << endl;
-  else {
-    cout << "breakpoints:";     // print this once
-    for (int i : breakpoints) {
-      if (i != *breakpoints.begin()) {
-        cout << ",";
-      }
-      cout << " " << i;
-    }
-    cout << endl;
+void list_breakpoint_command(set<int> &breakpoints)
+{
+  for (int bp : breakpoints)
+    cout << bp << endl;
+  return;
+}
+
+void set_next_stmt(struct STMT *stmt, struct STMT *next)
+{
+  switch (stmt->stmt_type)
+  {
+  case STMT_ASSIGNMENT:
+    stmt->types.assignment->next_stmt = next;
+    break;
+
+  case STMT_FUNCTION_CALL:
+    stmt->types.function_call->next_stmt = next;
+    break;
+
+  case STMT_IF_THEN_ELSE:
+    stmt->types.if_then_else->next_stmt = next;
+    break;
+
+  case STMT_WHILE_LOOP:
+    stmt->types.while_loop->next_stmt = next;
+    break;
+
+  case STMT_PASS:
+    stmt->types.pass->next_stmt = next;
+    break;
+  }
+}
+
+struct STMT *get_next_stmt(struct STMT *cur)
+{
+  if (cur == nullptr)
+    return nullptr;
+
+  switch (cur->stmt_type)
+  {
+  case STMT_ASSIGNMENT:
+    return cur->types.assignment->next_stmt;
+
+  case STMT_FUNCTION_CALL:
+    return cur->types.function_call->next_stmt;
+
+  case STMT_IF_THEN_ELSE:
+    return cur->types.if_then_else->next_stmt;
+
+  case STMT_WHILE_LOOP:
+    return cur->types.while_loop->next_stmt;
+
+  case STMT_PASS:
+    return cur->types.pass->next_stmt;
+
+  default:
+    return nullptr;
   }
 }
 
@@ -143,15 +188,65 @@ void list_breakpoint_command(set<int> &breakpoints) {
  *
  * @return void
  */
-void next_line_command(struct STMT *cur) {}
+void next_line_command(struct STMT *cur)
+{
+  if (cur == nullptr)
+  {
+    cout << "Program has finished." << endl;
+    return;
+  }
+  cout << "Next line is: " << cur->line << endl;
+  return;
+}
+
+struct ExecuteResult execute_one_stmt(struct STMT *cur,
+                                      struct RAM *memory)
+{
+  struct STMT *next = get_next_stmt(cur);
+
+  set_next_stmt(cur, nullptr);
+
+  struct ExecuteResult result = execute(cur, memory);
+
+  set_next_stmt(cur, next);
+
+  return result;
+}
 
 /**
  * @brief step by executing the current statement command
  *
  * @return void
  */
-void step_command(struct STMT *&cur, struct RAM *memory, set<int> &breakpoints,
-                  bool &at_breakpoint) {}
+void step_command(struct STMT *&cur, struct RAM *memory,
+                  set<int> &breakpoints, bool &at_breakpoint)
+{
+  if (cur == nullptr)
+  {
+    cout << "Program has finished." << endl;
+    return;
+  }
+
+  struct ExecuteResult result = execute_one_stmt(cur, memory);
+
+  if (!result.Success)
+  {
+    cur = result.LastStmt;
+    at_breakpoint = false;
+    return;
+  }
+
+  cur = get_next_stmt(cur);
+
+  at_breakpoint = (cur != nullptr &&
+                   breakpoints.count(cur->line) > 0);
+
+  if (at_breakpoint)
+    cout << "Breakpoint at line " << cur->line << endl;
+
+  if (cur == nullptr)
+    cout << "Program has finished." << endl;
+}
 
 /**
  * @brief run program from current statement command
@@ -159,7 +254,36 @@ void step_command(struct STMT *&cur, struct RAM *memory, set<int> &breakpoints,
  * @return void
  */
 void run_program_command(struct STMT *&cur, struct RAM *memory,
-                         set<int> &breakpoints, bool &at_breakpoint) {}
+                         set<int> &breakpoints, bool &at_breakpoint)
+{
+  while (cur != nullptr)
+  {
+    if (at_breakpoint) // if we are on a bp
+    {
+      // pause
+      at_breakpoint = false;
+    }
+    else if (breakpoints.count(cur->line) > 0)
+    {
+      at_breakpoint = true;
+      cout << "Breakpoint at line " << cur->line << endl;
+      return;
+    }
+    struct STMT *current = cur;
+
+    struct ExecuteResult result = execute_one_stmt(current, memory);
+
+    if (!result.Success)
+    {
+      cur = result.LastStmt;
+      return;
+    }
+
+    cur = get_next_stmt(current);
+  }
+
+  cout << "Program has finished." << endl;
+}
 
 /**
  * @brief main
@@ -173,11 +297,14 @@ void run_program_command(struct STMT *&cur, struct RAM *memory,
  * @param argv Array of actual arguments
  * @return 0 Success
  */
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
   FILE *input = nullptr;
+
   cout << "** Simple gdb for nuPython **" << endl;
 
-  if (argc < 2) {
+  if (argc < 2)
+  {
     //
     // missing filename:
     //
@@ -200,69 +327,92 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  //
-  struct STMT *program = nullptr;
-  struct RAM *memory = nullptr;
+  TokenQueue *tokens = parser_parse(input);
+  if (tokens == NULL)
+  {
+    cout << "ERROR:An error occured while parsing." << endl;
+    fclose(input);
+    tokenqueue_destroy(tokens);
+    return 0;
+  }
+  struct STMT *program = programgraph_build(tokens);
+  if (program == NULL)
+  {
+    cout << "ERROR: An error occured while building the program." << endl;
+    tokenqueue_destroy(tokens);
+    fclose(input);
+    return 0;
+  }
+  struct RAM *memory = ram_init();
   struct STMT *cur = program;
   set<int> breakpoints;
   bool at_breakpoint = false;
-  // TODO (A): parse input, build program graph, ram_init
-  struct TokenQueue* tokens = parser_parse(input);
-
-  if (tokens == nullptr) {
-    fclose(input);
-    input = nullptr;   // prevent dangling pointer
-    return 0;
-  }
-  else {
-    program = programgraph_build(tokens);
-    cur     = program;
-    memory  = ram_init();
-  }
-
-  //
 
   //
   // command loop:
   //
   string cmd;
 
-  while (true) {
+  while (true)
+  {
 
     cout << endl;
     cout << "Enter a command, h for help >" << endl;
     cin >> cmd;
 
-    if (cmd == "q") {
+    if (cmd == "q")
+    {
       //
       // quit:
       //
       break;
-    } else if (cmd == "h") {
+    }
+    else if (cmd == "h")
+    {
       help_command();
-    } else if (cmd == "pg") {
+    }
+    else if (cmd == "pg")
+    {
       print_graph_command(program);
-    } else if (cmd == "sm") {
+    }
+    else if (cmd == "sm")
+    {
       show_memory_command(memory);
-    } else if (cmd == "b") {
+    }
+    else if (cmd == "b")
+    {
       int n;
       cin >> n;
       breakpoint_command(breakpoints, n);
-    } else if (cmd == "rb") {
+    }
+    else if (cmd == "rb")
+    {
       int n;
       cin >> n;
       remove_breakpoint_command(breakpoints, n);
-    } else if (cmd == "cb") {
+    }
+    else if (cmd == "cb")
+    {
       clear_breakpoint_command(breakpoints);
-    } else if (cmd == "lb") {
+    }
+    else if (cmd == "lb")
+    {
       list_breakpoint_command(breakpoints);
-    } else if (cmd == "w") {
+    }
+    else if (cmd == "w")
+    {
       next_line_command(cur);
-    } else if (cmd == "s") {
+    }
+    else if (cmd == "s")
+    {
       step_command(cur, memory, breakpoints, at_breakpoint);
-    } else if (cmd == "r") {
+    }
+    else if (cmd == "r")
+    {
       run_program_command(cur, memory, breakpoints, at_breakpoint);
-    } else {
+    }
+    else
+    {
       cout << "unknown command" << endl;
     }
 
@@ -271,15 +421,13 @@ int main(int argc, char *argv[]) {
   //
   // done: free data structures, close file, and return:
   //
+  ram_destroy(memory);
+  programgraph_destroy(program);
+  tokenqueue_destroy(tokens);
+
   cout << endl;
   cout << "** Done **" << endl;
 
-  //
-  // TODO (A): ram_destroy, programgraph_destroy, tokenqueue_destroy
-  //
-  tokenqueue_destroy(tokens);
-  ram_destroy(memory);
-  programgraph_destroy(program);
   fclose(input);
 
   return 0;
