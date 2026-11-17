@@ -202,9 +202,6 @@ int main(int argc, char *argv[])
     return 0;
   }
 
-  //
-  // TODO (A): parse input, build program graph, ram_init
-  //
   TokenQueue *tokens = parser_parse(input);
   if (tokens == NULL)
   {
