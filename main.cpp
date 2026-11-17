@@ -66,14 +66,18 @@ void help_command() {
  *
  * @return void
  */
-void print_graph_command(struct STMT *program) {}
+void print_graph_command(struct STMT *program) {
+  programgraph_print(program);
+}
 
 /**
  * @brief show memory contents command
  *
  * @return void
  */
-void show_memory_command(struct RAM *memory) {}
+void show_memory_command(struct RAM *memory) {
+  ram_print(memory);
+}
 
 /**
  * @brief set breakpoint at line n command
@@ -81,7 +85,13 @@ void show_memory_command(struct RAM *memory) {}
  * @param n line number to set the breakpoint at
  * @return void
  */
-void breakpoint_command(set<int> &breakpoints, int n) {}
+void breakpoint_command(set<int> &breakpoints, int n) {
+  if (breakpoints.count(n)) cout << "breakpoint exists" << endl;
+  else {
+    breakpoints.insert(n);
+    cout << "breakpoint set" << endl;
+  }
+}
 
 /**
  * @brief remove breakpoint at line n command
@@ -89,21 +99,44 @@ void breakpoint_command(set<int> &breakpoints, int n) {}
  * @param n line number to remove the breakpoint from
  * @return void
  */
-void remove_breakpoint_command(set<int> &breakpoints, int n) {}
+void remove_breakpoint_command(set<int> &breakpoints, int n) {
+  if (!breakpoints.count(n)) {
+    cout << "no such breakpoint" << endl;
+  }
+  else {
+    breakpoints.erase(n);  // remove breakpoint
+    cout << "breakpoint removed" << endl;
+  }
+}
 
 /**
  * @brief clear all breakpoint command
  *
  * @return void
  */
-void clear_breakpoint_command(set<int> &breakpoints) {}
+void clear_breakpoint_command(set<int> &breakpoints) {
+  breakpoints.clear();   // remove all elements from set<int> breakpoints
+  cout << "all breakpoints removed" << endl;
+}
 
 /**
  * @brief list breakpoint command
  *
  * @return void
  */
-void list_breakpoint_command(set<int> &breakpoints) {}
+void list_breakpoint_command(set<int> &breakpoints) {
+  if (breakpoints.empty()) cout << "breakpoints: none" << endl;
+  else {
+    cout << "breakpoints:";     // print this once
+    for (int i : breakpoints) {
+      if (i != *breakpoints.begin()) {
+        cout << ",";
+      }
+      cout << " " << i;
+    }
+    cout << endl;
+  }
+}
 
 /**
  * @brief what line will execute next command
@@ -168,13 +201,26 @@ int main(int argc, char *argv[]) {
   }
 
   //
-  // TODO (A): parse input, build program graph, ram_init
-  //
   struct STMT *program = nullptr;
   struct RAM *memory = nullptr;
   struct STMT *cur = program;
   set<int> breakpoints;
   bool at_breakpoint = false;
+  // TODO (A): parse input, build program graph, ram_init
+  struct TokenQueue* tokens = parser_parse(input);
+
+  if (tokens == nullptr) {
+    fclose(input);
+    input = nullptr;   // prevent dangling pointer
+    return 0;
+  }
+  else {
+    program = programgraph_build(tokens);
+    cur     = program;
+    memory  = ram_init();
+  }
+
+  //
 
   //
   // command loop:
@@ -231,6 +277,9 @@ int main(int argc, char *argv[]) {
   //
   // TODO (A): ram_destroy, programgraph_destroy, tokenqueue_destroy
   //
+  tokenqueue_destroy(tokens);
+  ram_destroy(memory);
+  programgraph_destroy(program);
   fclose(input);
 
   return 0;
