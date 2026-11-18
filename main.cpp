@@ -130,6 +130,59 @@ void list_breakpoint_command(set<int> &breakpoints)
   return;
 }
 
+void set_next_stmt(struct STMT *stmt, struct STMT *next)
+{
+  switch (stmt->stmt_type)
+  {
+  case STMT_ASSIGNMENT:
+    stmt->types.assignment->next_stmt = next;
+    break;
+
+  case STMT_FUNCTION_CALL:
+    stmt->types.function_call->next_stmt = next;
+    break;
+
+  case STMT_IF_THEN_ELSE:
+    stmt->types.if_then_else->next_stmt = next;
+    break;
+
+  case STMT_WHILE_LOOP:
+    stmt->types.while_loop->next_stmt = next;
+    break;
+
+  case STMT_PASS:
+    stmt->types.pass->next_stmt = next;
+    break;
+  }
+}
+
+struct STMT *get_next_stmt(struct STMT *cur)
+{
+  if (cur == nullptr)
+    return nullptr;
+
+  switch (cur->stmt_type)
+  {
+  case STMT_ASSIGNMENT:
+    return cur->types.assignment->next_stmt;
+
+  case STMT_FUNCTION_CALL:
+    return cur->types.function_call->next_stmt;
+
+  case STMT_IF_THEN_ELSE:
+    return cur->types.if_then_else->next_stmt;
+
+  case STMT_WHILE_LOOP:
+    return cur->types.while_loop->next_stmt;
+
+  case STMT_PASS:
+    return cur->types.pass->next_stmt;
+
+  default:
+    return nullptr;
+  }
+}
+
 /**
  * @brief what line will execute next command
  *
@@ -137,8 +190,27 @@ void list_breakpoint_command(set<int> &breakpoints)
  */
 void next_line_command(struct STMT *cur)
 {
+  if (cur == nullptr)
+  {
+    cout << "Program has finished." << endl;
+    return;
+  }
   cout << "Next line is: " << cur->line << endl;
   return;
+}
+
+struct ExecuteResult execute_one_stmt(struct STMT *cur,
+                                      struct RAM *memory)
+{
+  struct STMT *next = get_next_stmt(cur);
+
+  set_next_stmt(cur, nullptr);
+
+  struct ExecuteResult result = execute(cur, memory);
+
+  set_next_stmt(cur, next);
+
+  return result;
 }
 
 /**
@@ -146,8 +218,35 @@ void next_line_command(struct STMT *cur)
  *
  * @return void
  */
-void step_command(struct STMT *&cur, struct RAM *memory, set<int> &breakpoints,
-                  bool &at_breakpoint) {}
+void step_command(struct STMT *&cur, struct RAM *memory,
+                  set<int> &breakpoints, bool &at_breakpoint)
+{
+  if (cur == nullptr)
+  {
+    cout << "Program has finished." << endl;
+    return;
+  }
+
+  struct ExecuteResult result = execute_one_stmt(cur, memory);
+
+  if (!result.Success)
+  {
+    cur = result.LastStmt;
+    at_breakpoint = false;
+    return;
+  }
+
+  cur = get_next_stmt(cur);
+
+  at_breakpoint = (cur != nullptr &&
+                   breakpoints.count(cur->line) > 0);
+
+  if (at_breakpoint)
+    cout << "Breakpoint at line " << cur->line << endl;
+
+  if (cur == nullptr)
+    cout << "Program has finished." << endl;
+}
 
 /**
  * @brief run program from current statement command
@@ -157,7 +256,33 @@ void step_command(struct STMT *&cur, struct RAM *memory, set<int> &breakpoints,
 void run_program_command(struct STMT *&cur, struct RAM *memory,
                          set<int> &breakpoints, bool &at_breakpoint)
 {
-  // TODO:
+  while (cur != nullptr)
+  {
+    if (at_breakpoint) // if we are on a bp
+    {
+      // pause
+      at_breakpoint = false;
+    }
+    else if (breakpoints.count(cur->line) > 0)
+    {
+      at_breakpoint = true;
+      cout << "Breakpoint at line " << cur->line << endl;
+      return;
+    }
+    struct STMT *current = cur;
+
+    struct ExecuteResult result = execute_one_stmt(current, memory);
+
+    if (!result.Success)
+    {
+      cur = result.LastStmt;
+      return;
+    }
+
+    cur = get_next_stmt(current);
+  }
+
+  cout << "Program has finished." << endl;
 }
 
 /**
